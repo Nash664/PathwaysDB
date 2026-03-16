@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  code     String    @id @db.VarChar(20)
+  name     String
+  programs Program[]
+}
+
+model Program {
+  code          String         @id @db.VarChar(20)
+  title         String
+  schoolCode    String?
+  school        School?        @relation(fields: [schoolCode], references: [code])
+  programCycles ProgramCycle[]
+}
+
+model Course {
+  code                String               @id @db.VarChar(30)
+  title               String
+  preRequisite        String?
+  coRequisite         String?
+  programCycleCourses ProgramCycleCourse[]
+}
+
+model ProgramCycle {
+  id          String               @id @default(cuid())
+  programCode String
+  term        String
+  program     Program              @relation(fields: [programCode], references: [code])
+  courses     ProgramCycleCourse[]
+
+  @@unique([programCode, term])
+}
+
+model ProgramCycleCourse {
+  id             String       @id @default(cuid())
+  programCycleId String
+  courseCode     String
+  semester       Int?
+  hoursPerWeek   Int?
+  programCycle   ProgramCycle @relation(fields: [programCycleId], references: [id])
+  course         Course       @relation(fields: [courseCode], references: [code])
+
+  @@unique([programCycleId, courseCode])
+}

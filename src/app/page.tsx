@@ -1,64 +1,81 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import CourseCodeSearch from "@/components/CourseCodeSearch";
+import ProgramCycleSelector from "@/components/ProgramCycleSelector";
 
 export default function Home() {
+  const [resetSignal, setResetSignal] = useState(0);
+  const [activeTab, setActiveTab] = useState<"program" | "course">("program");
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              College Pathways
+            </p>
+            <h1 className="text-2xl font-semibold">
+              Program &amp; Cycle Course Finder
+            </h1>
+          </div>
+          <Link
+            href="/admin"
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+          >
+            Admin
+          </Link>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold">Find your courses</h2>
+          <p className="text-sm text-slate-600">
+            Select a program and a cycle (for example 2024-2025) to view the
+            courses in that plan.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => setResetSignal((prev) => prev + 1)}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Clear all
+          </button>
+        </section>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("program")}
+            className={`rounded-full px-4 py-2 text-sm font-medium ${
+              activeTab === "program"
+                ? "bg-slate-900 text-white"
+                : "border border-slate-300 text-slate-700 hover:border-slate-400"
+            }`}
           >
-            Documentation
-          </a>
+            Search your courses
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("course")}
+            className={`rounded-full px-4 py-2 text-sm font-medium ${
+              activeTab === "course"
+                ? "bg-slate-900 text-white"
+                : "border border-slate-300 text-slate-700 hover:border-slate-400"
+            }`}
+          >
+            Find by course ID
+          </button>
         </div>
+
+        {activeTab === "program" ? (
+          <ProgramCycleSelector resetSignal={resetSignal} />
+        ) : (
+          <CourseCodeSearch resetSignal={resetSignal} />
+        )}
       </main>
     </div>
   );
