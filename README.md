@@ -2,6 +2,16 @@
 
 Full-stack Next.js app for selecting a program + cycle and viewing courses.
 
+## What we built
+- Student view with tabs: program/cycle course list and course-code search.
+- Admin login with Excel import (replaces DB contents).
+- Admin course manager to edit course info plus semester/hours per cycle.(not working properly)
+
+## Known limitations / not working yet
+- Course title/code edits are global across all cycles (no per-cycle overrides).
+- No admin UI to add/remove a course from a cycle (edit only).
+- No production deployment instructions yet (local only in this README).
+
 ## Run locally (macOS)
 1. Install Node.js (LTS) from https://nodejs.org.
 2. Install PostgreSQL (recommended via Homebrew):
