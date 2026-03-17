@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 type CourseHit = {
+  courseTitle: string;
   programCode: string;
   programTitle: string;
   term: string;
@@ -22,6 +23,7 @@ export default function CourseCodeSearch({
   const [results, setResults] = useState<CourseHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const courseTitle = results[0]?.courseTitle;
 
   const handleSearch = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -82,7 +84,7 @@ export default function CourseCodeSearch({
         <button
           type="submit"
           disabled={loading}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
         >
           {loading ? "Searching..." : "Search"}
         </button>
@@ -91,8 +93,22 @@ export default function CourseCodeSearch({
       {status && <p className="text-sm text-slate-600">{status}</p>}
 
       {results.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-slate-200">
-          <table className="w-full text-left text-sm">
+        <div className="space-y-3">
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+            >
+              Print
+            </button>
+          </div>
+          <div className="print-area overflow-hidden rounded-lg border border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+              {courseCode || "Course"}{" "}
+              {courseTitle ? `• ${courseTitle}` : ""}
+            </div>
+            <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-4 py-2">Program</th>
@@ -121,7 +137,8 @@ export default function CourseCodeSearch({
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
     </section>

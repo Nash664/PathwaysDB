@@ -23,7 +23,7 @@ export default function Home() {
           </div>
           <Link
             href="/admin"
-            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
           >
             Admin
           </Link>
@@ -40,7 +40,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setResetSignal((prev) => prev + 1)}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
           >
             Clear all
           </button>
@@ -50,10 +50,10 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setActiveTab("program")}
-            className={`rounded-full px-4 py-2 text-sm font-medium ${
+            className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm ${
               activeTab === "program"
                 ? "bg-slate-900 text-white"
-                : "border border-slate-300 text-slate-700 hover:border-slate-400"
+                : "border border-slate-400 bg-white text-slate-900 hover:border-slate-500"
             }`}
           >
             Search your courses
@@ -61,10 +61,10 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setActiveTab("course")}
-            className={`rounded-full px-4 py-2 text-sm font-medium ${
+            className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm ${
               activeTab === "course"
                 ? "bg-slate-900 text-white"
-                : "border border-slate-300 text-slate-700 hover:border-slate-400"
+                : "border border-slate-400 bg-white text-slate-900 hover:border-slate-500"
             }`}
           >
             Find by course ID

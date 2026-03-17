@@ -7,7 +7,7 @@ export default function AdminSignOutButton() {
     <button
       type="button"
       onClick={() => signOut({ callbackUrl: "/admin/login" })}
-      className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+      className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
     >
       Sign out
     </button>

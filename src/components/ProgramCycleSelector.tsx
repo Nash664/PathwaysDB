@@ -29,6 +29,7 @@ export default function ProgramCycleSelector({
   const [programCode, setProgramCode] = useState("");
   const [term, setTerm] = useState("");
   const [loading, setLoading] = useState(false);
+  const selectedProgram = programs.find((program) => program.code === programCode);
 
   useEffect(() => {
     setProgramCode("");
@@ -124,8 +125,22 @@ export default function ProgramCycleSelector({
       )}
 
       {!loading && term && (
-        <div className="overflow-hidden rounded-lg border border-slate-200">
-          <table className="w-full text-left text-sm">
+        <div className="space-y-3">
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+            >
+              Print
+            </button>
+          </div>
+          <div className="print-area overflow-hidden rounded-lg border border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+              {selectedProgram?.title ?? "Program"} ({programCode || "N/A"}) •{" "}
+              {term}
+            </div>
+            <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-4 py-2">Course Code</th>
@@ -168,7 +183,8 @@ export default function ProgramCycleSelector({
                 </tr>
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
     </section>

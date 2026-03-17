@@ -24,6 +24,7 @@ export async function GET(request: Request) {
           program: true,
         },
       },
+      course: true,
     },
     orderBy: [
       { programCycle: { programCode: "asc" } },
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json(
     results.map((row) => ({
+      courseTitle: row.course.title,
       programCode: row.programCycle.programCode,
       programTitle: row.programCycle.program.title,
       term: row.programCycle.term,
