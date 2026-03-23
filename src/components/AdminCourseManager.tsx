@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Program = {
   code: string;
@@ -11,301 +11,425 @@ type OfferingRow = {
   id: string;
   courseCode: string;
   courseTitle: string;
-  preRequisite: string | null;
-  coRequisite: string | null;
+  preRequisite?: string | null;
   semester: number | null;
   hoursPerWeek: number | null;
 };
 
-type EditRow = {
-  courseCode: string;
-  courseTitle: string;
-  preRequisite: string;
-  coRequisite: string;
-  semester: string;
-  hoursPerWeek: string;
-};
-
-type DraftCourse = {
-  code: string;
-  title: string;
-  preRequisite: string;
-  coRequisite: string;
-};
-
-const emptyDraft: DraftCourse = {
-  code: "",
-  title: "",
-  preRequisite: "",
-  coRequisite: "",
-};
-
 export default function AdminCourseManager() {
   const [programs, setPrograms] = useState<Program[]>([]);
-  const [cycles, setCycles] = useState<string[]>([]);
-  const [programCode, setProgramCode] = useState("");
-  const [term, setTerm] = useState("");
+  const [academicYears, setAcademicYears] = useState<string[]>([]);
   const [offerings, setOfferings] = useState<OfferingRow[]>([]);
-  const [edits, setEdits] = useState<Record<string, EditRow>>({});
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-  const [draft, setDraft] = useState<DraftCourse>(emptyDraft);
-  const [creating, setCreating] = useState(false);
 
-  const sortedOfferings = useMemo(
-    () =>
-      [...offerings].sort((a, b) =>
-        a.courseCode.localeCompare(b.courseCode)
-      ),
-    [offerings]
-  );
+  const [selectedProgram, setSelectedProgram] = useState("");
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
+
+  const [newCourse, setNewCourse] = useState({
+    code: "",
+    title: "",
+    preRequisite: "",
+    programCode: "",
+    academicYear: "",
+    semester: "",
+    hoursPerWeek: "",
+  });
+
+  const [status, setStatus] = useState<string | null>(null);
+  const [loadingCreate, setLoadingCreate] = useState(false);
+  const [loadingOfferings, setLoadingOfferings] = useState(false);
+  const [savingRowId, setSavingRowId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/public/programs")
       .then((res) => res.json())
-      .then((data: Program[]) => setPrograms(data))
+      .then((data) => setPrograms(Array.isArray(data) ? data : []))
       .catch(() => setPrograms([]));
+
+    fetch("/api/public/academic-years")
+      .then((res) => res.json())
+      .then((data) => setAcademicYears(Array.isArray(data) ? data : []))
+      .catch(() => setAcademicYears([]));
   }, []);
 
   useEffect(() => {
-    if (!programCode) {
-      setCycles([]);
-      setTerm("");
+    if (!selectedProgram || !selectedAcademicYear) {
       setOfferings([]);
       return;
     }
 
-    fetch(`/api/public/cycles?programCode=${encodeURIComponent(programCode)}`)
-      .then((res) => res.json())
-      .then((data: string[]) => setCycles(data))
-      .catch(() => setCycles([]));
-  }, [programCode]);
+    fetchOfferings(selectedProgram, selectedAcademicYear);
+  }, [selectedProgram, selectedAcademicYear]);
 
-  useEffect(() => {
-    if (!programCode || !term) {
+  const fetchOfferings = async (programCode: string, academicYear: string) => {
+    try {
+      setLoadingOfferings(true);
+
+      const response = await fetch(
+        `/api/admin/offerings?programCode=${encodeURIComponent(
+          programCode
+        )}&term=${encodeURIComponent(academicYear)}`
+      );
+
+      const data = await response.json();
+      setOfferings(Array.isArray(data) ? data : []);
+    } catch {
       setOfferings([]);
+    } finally {
+      setLoadingOfferings(false);
+    }
+  };
+
+  const handleCreateCourse = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (
+      !newCourse.code.trim() ||
+      !newCourse.title.trim() ||
+      !newCourse.programCode ||
+      !newCourse.academicYear
+    ) {
+      setStatus(
+        "Course code, course title, program, and academic year are required."
+      );
+      window.alert(
+        "Course code, course title, program, and academic year are required."
+      );
       return;
     }
 
-    setLoading(true);
-    setStatus(null);
-    fetch(
-      `/api/admin/offerings?programCode=${encodeURIComponent(
-        programCode
-      )}&term=${encodeURIComponent(term)}`
-    )
-      .then((res) => res.json())
-      .then((data: OfferingRow[]) => {
-        setOfferings(data);
-        const nextEdits: Record<string, EditRow> = {};
-        data.forEach((row) => {
-          nextEdits[row.id] = {
-            courseCode: row.courseCode,
-            courseTitle: row.courseTitle,
-            preRequisite: row.preRequisite ?? "",
-            coRequisite: row.coRequisite ?? "",
-            semester: row.semester?.toString() ?? "",
-            hoursPerWeek: row.hoursPerWeek?.toString() ?? "",
-          };
-        });
-        setEdits(nextEdits);
-      })
-      .finally(() => setLoading(false));
-  }, [programCode, term]);
+    try {
+      setLoadingCreate(true);
+      setStatus(null);
 
-  const handleEditChange = (
+      const createdProgramCode = newCourse.programCode;
+      const createdAcademicYear = newCourse.academicYear;
+
+      const response = await fetch("/api/admin/courses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          code: newCourse.code.trim(),
+          title: newCourse.title.trim(),
+          preRequisite: newCourse.preRequisite.trim() || null,
+          programCode: newCourse.programCode,
+          academicYear: newCourse.academicYear,
+          semester: newCourse.semester ? Number(newCourse.semester) : null,
+          hoursPerWeek: newCourse.hoursPerWeek
+            ? Number(newCourse.hoursPerWeek)
+            : null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        const message = result?.message || "Failed to create course.";
+        setStatus(message);
+        window.alert(message);
+        return;
+      }
+
+      setStatus("Course created and added successfully.");
+      window.alert("Course created and added successfully.");
+
+      setNewCourse({
+        code: "",
+        title: "",
+        preRequisite: "",
+        programCode: "",
+        academicYear: "",
+        semester: "",
+        hoursPerWeek: "",
+      });
+
+      setSelectedProgram(createdProgramCode);
+      setSelectedAcademicYear(createdAcademicYear);
+      await fetchOfferings(createdProgramCode, createdAcademicYear);
+    } catch {
+      setStatus("Failed to create course.");
+      window.alert("Failed to create course.");
+    } finally {
+      setLoadingCreate(false);
+    }
+  };
+
+  const handleOfferingChange = (
     id: string,
-    field: keyof EditRow,
+    field:
+      | "courseCode"
+      | "courseTitle"
+      | "preRequisite"
+      | "semester"
+      | "hoursPerWeek",
     value: string
   ) => {
-    setEdits((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setStatus(null);
-    setCreating(true);
-    const response = await fetch("/api/admin/courses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code: draft.code,
-        title: draft.title,
-        preRequisite: draft.preRequisite,
-        coRequisite: draft.coRequisite,
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      setStatus(data?.message || "Create failed.");
-      setCreating(false);
-      return;
-    }
-    setDraft(emptyDraft);
-    setCreating(false);
-    setStatus("Course created.");
-  };
-
-  const saveRow = async (row: OfferingRow) => {
-    const edit = edits[row.id];
-    if (!edit) {
-      return;
-    }
-
-    const parseJson = async (response: Response) => {
-      const contentType = response.headers.get("content-type") ?? "";
-      if (!contentType.includes("application/json")) {
-        return null;
-      }
-      try {
-        return await response.json();
-      } catch {
-        return null;
-      }
-    };
-
-    setStatus(null);
-    const semester = edit.semester.trim() ? Number(edit.semester) : null;
-    const hoursPerWeek = edit.hoursPerWeek.trim()
-      ? Number(edit.hoursPerWeek)
-      : null;
-
-    const courseResponse = await fetch(
-      `/api/admin/courses/${encodeURIComponent(row.courseCode)}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: edit.courseTitle,
-          preRequisite: edit.preRequisite,
-          coRequisite: edit.coRequisite,
-          newCode:
-            edit.courseCode.trim() !== row.courseCode
-              ? edit.courseCode.trim()
-              : undefined,
-        }),
-      }
-    );
-    const courseData = await parseJson(courseResponse);
-    if (!courseResponse.ok) {
-      setStatus(courseData?.message || "Course update failed.");
-      return;
-    }
-
-    const offeringResponse = await fetch(`/api/admin/offerings/${row.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ semester, hoursPerWeek }),
-    });
-    const offeringData = await parseJson(offeringResponse);
-    if (!offeringResponse.ok) {
-      setStatus(offeringData?.message || "Offering update failed.");
-      return;
-    }
-
     setOfferings((prev) =>
-      prev.map((item) =>
-        item.id === row.id
+      prev.map((row) =>
+        row.id === id
           ? {
-              ...item,
-              courseCode: courseData?.code ?? edit.courseCode,
-              courseTitle: courseData?.title ?? edit.courseTitle,
-              preRequisite: courseData?.preRequisite ?? edit.preRequisite,
-              coRequisite: courseData?.coRequisite ?? edit.coRequisite,
-              semester: offeringData?.semester ?? semester,
-              hoursPerWeek: offeringData?.hoursPerWeek ?? hoursPerWeek,
+              ...row,
+              [field]:
+                field === "semester" || field === "hoursPerWeek"
+                  ? value === ""
+                    ? null
+                    : Number(value)
+                  : value,
             }
-          : item
+          : row
       )
     );
-    setStatus("Course updated.");
+  };
+
+  const handleSaveOffering = async (row: OfferingRow) => {
+    try {
+      setSavingRowId(row.id);
+      setStatus(null);
+
+      const response = await fetch(`/api/admin/offerings/${row.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          courseCode: row.courseCode.trim(),
+          title: row.courseTitle.trim(),
+          preRequisite: row.preRequisite?.trim() || null,
+          semester: row.semester,
+          hoursPerWeek: row.hoursPerWeek,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        const message = result?.message || "Failed to save changes.";
+        setStatus(message);
+        window.alert(message);
+        return;
+      }
+
+      setStatus("Course updated successfully.");
+      window.alert("Course updated successfully.");
+
+      if (selectedProgram && selectedAcademicYear) {
+        await fetchOfferings(selectedProgram, selectedAcademicYear);
+      }
+    } catch {
+      setStatus("Failed to save changes.");
+      window.alert("Failed to save changes.");
+    } finally {
+      setSavingRowId(null);
+    }
+  };
+
+  const handleDeleteOffering = async (id: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this course from this academic year?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setSavingRowId(id);
+      setStatus(null);
+
+      const response = await fetch(`/api/admin/offerings/${id}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        const message = result?.message || "Failed to delete course.";
+        setStatus(message);
+        window.alert(message);
+        return;
+      }
+
+      setStatus("Course deleted successfully.");
+      window.alert("Course deleted successfully.");
+
+      if (selectedProgram && selectedAcademicYear) {
+        await fetchOfferings(selectedProgram, selectedAcademicYear);
+      }
+    } catch {
+      setStatus("Failed to delete course.");
+      window.alert("Failed to delete course.");
+    } finally {
+      setSavingRowId(null);
+    }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Add a course</h2>
-        <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={handleCreate}>
-          <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Course code</span>
-            <input
-              className="w-full rounded-md border border-slate-200 px-3 py-2"
-              value={draft.code}
-              onChange={(event) =>
-                setDraft((prev) => ({ ...prev, code: event.target.value }))
-              }
-              required
-            />
-          </label>
-          <label className="space-y-2 text-sm md:col-span-1">
-            <span className="font-medium text-slate-700">Title</span>
-            <input
-              className="w-full rounded-md border border-slate-200 px-3 py-2"
-              value={draft.title}
-              onChange={(event) =>
-                setDraft((prev) => ({ ...prev, title: event.target.value }))
-              }
-              required
-            />
-          </label>
-          <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Pre-requisite</span>
-            <input
-              className="w-full rounded-md border border-slate-200 px-3 py-2"
-              value={draft.preRequisite}
-              onChange={(event) =>
-                setDraft((prev) => ({
-                  ...prev,
-                  preRequisite: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Co-requisite</span>
-            <input
-              className="w-full rounded-md border border-slate-200 px-3 py-2"
-              value={draft.coRequisite}
-              onChange={(event) =>
-                setDraft((prev) => ({
-                  ...prev,
-                  coRequisite: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <div className="md:col-span-2">
+    <div className="space-y-8">
+      <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold tracking-tight">Add a course</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Add a course and place it directly into a program and academic year.
+          </p>
+        </div>
+
+        <form onSubmit={handleCreateCourse} className="space-y-5">
+          <div className="grid gap-5 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">
+                Course code
+              </span>
+              <input
+                type="text"
+                value={newCourse.code}
+                onChange={(e) =>
+                  setNewCourse((prev) => ({ ...prev, code: e.target.value }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">
+                Course title
+              </span>
+              <input
+                type="text"
+                value={newCourse.title}
+                onChange={(e) =>
+                  setNewCourse((prev) => ({ ...prev, title: e.target.value }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">
+                Pre-requisite
+              </span>
+              <input
+                type="text"
+                value={newCourse.preRequisite}
+                onChange={(e) =>
+                  setNewCourse((prev) => ({
+                    ...prev,
+                    preRequisite: e.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Program</span>
+              <select
+                value={newCourse.programCode}
+                onChange={(e) =>
+                  setNewCourse((prev) => ({
+                    ...prev,
+                    programCode: e.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              >
+                <option value="">Select a program</option>
+                {programs.map((program) => (
+                  <option key={program.code} value={program.code}>
+                    {program.title} ({program.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">
+                Academic year
+              </span>
+              <select
+                value={newCourse.academicYear}
+                onChange={(e) =>
+                  setNewCourse((prev) => ({
+                    ...prev,
+                    academicYear: e.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              >
+                <option value="">Select an academic year</option>
+                {academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Semester</span>
+              <input
+                type="number"
+                min="1"
+                value={newCourse.semester}
+                onChange={(e) =>
+                  setNewCourse((prev) => ({
+                    ...prev,
+                    semester: e.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">
+                Weekly hours
+              </span>
+              <input
+                type="number"
+                min="0"
+                value={newCourse.hoursPerWeek}
+                onChange={(e) =>
+                  setNewCourse((prev) => ({
+                    ...prev,
+                    hoursPerWeek: e.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
             <button
               type="submit"
-              disabled={creating}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+              disabled={loadingCreate}
+              className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
             >
-              {creating ? "Saving..." : "Create course"}
+              {loadingCreate ? "Creating..." : "Create course"}
             </button>
+
+            {status && <p className="text-sm text-slate-600">{status}</p>}
           </div>
         </form>
-      </div>
+      </section>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Edit courses in a cycle</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Select a program and cycle to update course info, semester, and
-          hours/week together.
-        </p>
+      <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Edit courses in an academic year
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Change course code, course title, pre-requisite, semester, and weekly
+            hours for the selected program and academic year.
+          </p>
+        </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Program</span>
+        <div className="grid gap-5 md:grid-cols-2">
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-700">Program</span>
             <select
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-              value={programCode}
-              onChange={(event) => setProgramCode(event.target.value)}
+              value={selectedProgram}
+              onChange={(e) => setSelectedProgram(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
             >
               <option value="">Select a program</option>
               {programs.map((program) => (
@@ -315,149 +439,153 @@ export default function AdminCourseManager() {
               ))}
             </select>
           </label>
-          <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Program cycle</span>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-slate-700">
+              Academic year
+            </span>
             <select
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2"
-              value={term}
-              onChange={(event) => setTerm(event.target.value)}
-              disabled={!cycles.length}
+              value={selectedAcademicYear}
+              onChange={(e) => setSelectedAcademicYear(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
             >
-              <option value="">Select a cycle</option>
-              {cycles.map((cycle) => (
-                <option key={cycle} value={cycle}>
-                  {cycle}
+              <option value="">Select an academic year</option>
+              {academicYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
                 </option>
               ))}
             </select>
           </label>
         </div>
 
-        {loading && (
-          <p className="mt-4 text-sm text-slate-500">Loading courses...</p>
-        )}
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+            {loadingOfferings
+              ? "Loading course offerings..."
+              : selectedProgram && selectedAcademicYear
+              ? `${offerings.length} course offering${
+                  offerings.length === 1 ? "" : "s"
+                }`
+              : "Select a program and academic year to view offerings"}
+          </div>
 
-        {!loading && sortedOfferings.length > 0 && (
-          <div className="mt-4 overflow-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
-                  <th className="px-4 py-2">Course code</th>
-                  <th className="px-4 py-2">Title</th>
-                  <th className="px-4 py-2">Pre-Req</th>
-                  <th className="px-4 py-2">Co-Req</th>
-                  <th className="px-4 py-2">Semester</th>
-                  <th className="px-4 py-2">Hours/Week</th>
-                  <th className="px-4 py-2">Save</th>
+                  <th className="px-4 py-3">Course Code</th>
+                  <th className="px-4 py-3">Course Title</th>
+                  <th className="px-4 py-3">Pre-requisite</th>
+                  <th className="px-4 py-3">Semester</th>
+                  <th className="px-4 py-3">Weekly Hours</th>
+                  <th className="px-4 py-3">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedOfferings.map((row) => (
+                {offerings.map((row) => (
                   <tr key={row.id}>
-                    <td className="border-t px-4 py-2">
+                    <td className="border-t px-4 py-3">
                       <input
-                        className="w-32 rounded-md border border-slate-200 px-2 py-1 text-sm"
-                        value={edits[row.id]?.courseCode ?? ""}
-                        onChange={(event) =>
-                          handleEditChange(
-                            row.id,
-                            "courseCode",
-                            event.target.value
-                          )
+                        type="text"
+                        value={row.courseCode}
+                        onChange={(e) =>
+                          handleOfferingChange(row.id, "courseCode", e.target.value)
                         }
+                        className="w-32 rounded-lg border border-slate-200 px-3 py-2"
                       />
                     </td>
-                    <td className="border-t px-4 py-2">
+
+                    <td className="border-t px-4 py-3">
                       <input
-                        className="w-56 rounded-md border border-slate-200 px-2 py-1 text-sm"
-                        value={edits[row.id]?.courseTitle ?? ""}
-                        onChange={(event) =>
-                          handleEditChange(
-                            row.id,
-                            "courseTitle",
-                            event.target.value
-                          )
+                        type="text"
+                        value={row.courseTitle}
+                        onChange={(e) =>
+                          handleOfferingChange(row.id, "courseTitle", e.target.value)
                         }
+                        className="w-full min-w-[220px] rounded-lg border border-slate-200 px-3 py-2"
                       />
                     </td>
-                    <td className="border-t px-4 py-2">
+
+                    <td className="border-t px-4 py-3">
                       <input
-                        className="w-36 rounded-md border border-slate-200 px-2 py-1 text-sm"
-                        value={edits[row.id]?.preRequisite ?? ""}
-                        onChange={(event) =>
-                          handleEditChange(
-                            row.id,
-                            "preRequisite",
-                            event.target.value
-                          )
+                        type="text"
+                        value={row.preRequisite ?? ""}
+                        onChange={(e) =>
+                          handleOfferingChange(row.id, "preRequisite", e.target.value)
                         }
+                        className="w-full min-w-[180px] rounded-lg border border-slate-200 px-3 py-2"
                       />
                     </td>
-                    <td className="border-t px-4 py-2">
-                      <input
-                        className="w-36 rounded-md border border-slate-200 px-2 py-1 text-sm"
-                        value={edits[row.id]?.coRequisite ?? ""}
-                        onChange={(event) =>
-                          handleEditChange(
-                            row.id,
-                            "coRequisite",
-                            event.target.value
-                          )
-                        }
-                      />
-                    </td>
-                    <td className="border-t px-4 py-2">
+
+                    <td className="border-t px-4 py-3">
                       <input
                         type="number"
-                        className="w-20 rounded-md border border-slate-200 px-2 py-1 text-sm"
-                        value={edits[row.id]?.semester ?? ""}
-                        onChange={(event) =>
-                          handleEditChange(
-                            row.id,
-                            "semester",
-                            event.target.value
-                          )
+                        value={row.semester ?? ""}
+                        onChange={(e) =>
+                          handleOfferingChange(row.id, "semester", e.target.value)
                         }
+                        className="w-24 rounded-lg border border-slate-200 px-3 py-2"
                       />
                     </td>
-                    <td className="border-t px-4 py-2">
+
+                    <td className="border-t px-4 py-3">
                       <input
                         type="number"
-                        className="w-20 rounded-md border border-slate-200 px-2 py-1 text-sm"
-                        value={edits[row.id]?.hoursPerWeek ?? ""}
-                        onChange={(event) =>
-                          handleEditChange(
+                        value={row.hoursPerWeek ?? ""}
+                        onChange={(e) =>
+                          handleOfferingChange(
                             row.id,
                             "hoursPerWeek",
-                            event.target.value
+                            e.target.value
                           )
                         }
+                        className="w-28 rounded-lg border border-slate-200 px-3 py-2"
                       />
                     </td>
-                    <td className="border-t px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => saveRow(row)}
-                        className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-800"
-                      >
-                        Save
-                      </button>
+
+                    <td className="border-t px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveOffering(row)}
+                          disabled={savingRowId === row.id}
+                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                        >
+                          {savingRowId === row.id ? "Saving..." : "Save"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOffering(row.id)}
+                          disabled={savingRowId === row.id}
+                          className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
+
+                {!loadingOfferings &&
+                  selectedProgram &&
+                  selectedAcademicYear &&
+                  offerings.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="border-t px-4 py-8 text-center text-slate-500"
+                      >
+                        No course offerings found for this academic year.
+                      </td>
+                    </tr>
+                  )}
               </tbody>
             </table>
           </div>
-        )}
-
-        {!loading && programCode && term && sortedOfferings.length === 0 && (
-          <p className="mt-4 text-sm text-slate-500">
-            No courses found for this cycle.
-          </p>
-        )}
-      </div>
-
-      {status && <p className="text-sm text-slate-600">{status}</p>}
+        </div>
+      </section>
     </div>
   );
 }
