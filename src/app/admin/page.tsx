@@ -1,54 +1,46 @@
-import { getServerSession } from "next-auth";
-import Link from "next/link";
-import { redirect } from "next/navigation";
-import AdminSignOutButton from "@/components/AdminSignOutButton";
-import AdminUploadForm from "@/components/AdminUploadForm";
-import { authOptions } from "@/lib/auth";
+"use client";
 
-export default async function AdminPage() {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    redirect("/admin/login");
-  }
+import { useState } from "react";
+import Link from "next/link";
+import UnifiedCourseSearch from "@/components/UnifiedCourseSearch";
+
+export default function Home() {
+  const [resetSignal, setResetSignal] = useState(0);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-6">
+      <header className="relative z-30 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Admin Panel
+              College Pathways
             </p>
-            <h1 className="text-2xl font-semibold">Data Import</h1>
+            <h1 className="text-2xl font-semibold">
+              Program &amp; Academic Year Course Finder
+            </h1>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
-            >
-              Back to Student View
-            </Link>
-            <Link
-              href="/admin/courses"
-              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
-            >
-              Manage Courses
-            </Link>
-            <AdminSignOutButton />
-          </div>
+
+          <Link
+            href="/admin/courses"
+            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+          >
+            Admin
+          </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-6 px-6 py-10">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Upload Excel</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Upload the latest Excel file to replace the database contents. This
-            is useful when the program data changes.
-          </p>
-          <div className="mt-6">
-            <AdminUploadForm />
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight">Find your courses</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Search by program, academic year, semester, and course in one place.
+              </p>
+            </div>
           </div>
+
+          <UnifiedCourseSearch resetSignal={resetSignal} />
         </div>
       </main>
     </div>

@@ -1,60 +1,85 @@
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const courseCodeRaw = searchParams.get("courseCode");
 
-  if (!courseCodeRaw) {
-    return NextResponse.json(
-      { message: "Missing courseCode." },
-      { status: 400 }
-    );
-  }
+  const query = searchParams.get("query")?.trim() ?? "";
+  const program = searchParams.get("program")?.trim() ?? "";
+  const term = searchParams.get("term")?.trim() ?? "";
+  const semesterParam = searchParams.get("semester")?.trim() ?? "";
 
-  const courseCode = courseCodeRaw.trim();
+  const semester =
+    semesterParam && !Number.isNaN(Number(semesterParam))
+      ? Number(semesterParam)
+      : undefined;
 
-  const results = await prisma.programCycleCourse.findMany({
-    where: {
-      courseCode,
-    },
-    include: {
-      programCycle: {
-        include: {
-          program: true,
+  try {
+    const rows = await prisma.programCycleCourse.findMany({
+      where: {
+        ...(semester !== undefined ? { semester } : {}),
+        course: query
+          ? {
+              OR: [
+                { code: { contains: query, mode: "insensitive" } },
+                { title: { contains: query, mode: "insensitive" } },
+              ],
+            }
+          : undefined,
+        programCycle: {
+          ...(term ? { term } : {}),
+          program: program
+            ? {
+                OR: [
+                  { code: { contains: program, mode: "insensitive" } },
+                  { title: { contains: program, mode: "insensitive" } },
+                ],
+              }
+            : undefined,
         },
       },
-      course: true,
-    },
-    orderBy: [
-      { programCycle: { programCode: "asc" } },
-      { programCycle: { term: "asc" } },
-      { semester: "asc" },
-    ],
-  });
+      include: {
+        course: true,
+        programCycle: {
+          include: {
+            program: true,
+          },
+        },
+      },
+      orderBy: [
+        { programCycle: { programCode: "asc" } },
+        { programCycle: { term: "asc" } },
+        { semester: "asc" },
+      ],
+    });
 
-  const totals = await prisma.programCycleCourse.groupBy({
-    by: ["programCycleId", "semester"],
-    _sum: { hoursPerWeek: true },
-  });
+    const groupedHours = new Map<string, number>();
 
-  const totalMap = new Map(
-    totals.map((row) => [
-      `${row.programCycleId}__${row.semester ?? "na"}`,
-      row._sum.hoursPerWeek ?? null,
-    ])
-  );
+    rows.forEach((row) => {
+      const key = `${row.programCycle.programCode}__${row.programCycle.term}__${row.semester ?? ""}`;
+      groupedHours.set(key, (groupedHours.get(key) ?? 0) + (row.hoursPerWeek ?? 0));
+    });
 
-  return NextResponse.json(
-    results.map((row) => ({
-      courseTitle: row.course.title,
-      programCode: row.programCycle.programCode,
-      programTitle: row.programCycle.program.title,
-      term: row.programCycle.term,
-      semester: row.semester,
-      hoursPerWeek: row.hoursPerWeek,
-      semesterTotalHours:
-        totalMap.get(`${row.programCycleId}__${row.semester ?? "na"}`) ?? null,
-    }))
-  );
+    const results = rows.map((row) => {
+      const totalKey = `${row.programCycle.programCode}__${row.programCycle.term}__${row.semester ?? ""}`;
+
+      return {
+        courseCode: row.course.code,
+        courseTitle: row.course.title,
+        programCode: row.programCycle.program.code,
+        programTitle: row.programCycle.program.title,
+        term: row.programCycle.term,
+        semester: row.semester,
+        hoursPerWeek: row.hoursPerWeek,
+        semesterTotalHours: groupedHours.get(totalKey) ?? null,
+      };
+    });
+
+    return NextResponse.json(results);
+  } catch {
+    return NextResponse.json(
+      { message: "Search failed." },
+      { status: 500 }
+    );
+  }
 }
