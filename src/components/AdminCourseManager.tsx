@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminUploadForm from "@/components/AdminUploadForm";
+import AdminProgramManager from "@/components/AdminProgramManager";
 
 type Program = {
   code: string;
@@ -16,7 +18,11 @@ type OfferingRow = {
   hoursPerWeek: number | null;
 };
 
+type AdminTab = "programs" | "import" | "add" | "edit";
+
 export default function AdminCourseManager() {
+  const [activeTab, setActiveTab] = useState<AdminTab>("add");
+
   const [programs, setPrograms] = useState<Program[]>([]);
   const [academicYears, setAcademicYears] = useState<string[]>([]);
   const [offerings, setOfferings] = useState<OfferingRow[]>([]);
@@ -39,26 +45,25 @@ export default function AdminCourseManager() {
   const [loadingOfferings, setLoadingOfferings] = useState(false);
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/public/programs")
-      .then((res) => res.json())
-      .then((data) => setPrograms(Array.isArray(data) ? data : []))
-      .catch(() => setPrograms([]));
-
-    fetch("/api/public/academic-years")
-      .then((res) => res.json())
-      .then((data) => setAcademicYears(Array.isArray(data) ? data : []))
-      .catch(() => setAcademicYears([]));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedProgram || !selectedAcademicYear) {
-      setOfferings([]);
-      return;
+  const fetchPrograms = async () => {
+    try {
+      const response = await fetch("/api/public/programs");
+      const data = await response.json();
+      setPrograms(Array.isArray(data) ? data : []);
+    } catch {
+      setPrograms([]);
     }
+  };
 
-    fetchOfferings(selectedProgram, selectedAcademicYear);
-  }, [selectedProgram, selectedAcademicYear]);
+  const fetchAcademicYears = async () => {
+    try {
+      const response = await fetch("/api/public/academic-years");
+      const data = await response.json();
+      setAcademicYears(Array.isArray(data) ? data : []);
+    } catch {
+      setAcademicYears([]);
+    }
+  };
 
   const fetchOfferings = async (programCode: string, academicYear: string) => {
     try {
@@ -79,6 +84,20 @@ export default function AdminCourseManager() {
     }
   };
 
+  useEffect(() => {
+    fetchPrograms();
+    fetchAcademicYears();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProgram || !selectedAcademicYear) {
+      setOfferings([]);
+      return;
+    }
+
+    fetchOfferings(selectedProgram, selectedAcademicYear);
+  }, [selectedProgram, selectedAcademicYear]);
+
   const handleCreateCourse = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -88,12 +107,10 @@ export default function AdminCourseManager() {
       !newCourse.programCode ||
       !newCourse.academicYear
     ) {
-      setStatus(
-        "Course code, course title, program, and academic year are required."
-      );
-      window.alert(
-        "Course code, course title, program, and academic year are required."
-      );
+      const message =
+        "Course code, course title, program, and academic year are required.";
+      setStatus(message);
+      window.alert(message);
       return;
     }
 
@@ -146,10 +163,14 @@ export default function AdminCourseManager() {
 
       setSelectedProgram(createdProgramCode);
       setSelectedAcademicYear(createdAcademicYear);
+      setActiveTab("edit");
+
       await fetchOfferings(createdProgramCode, createdAcademicYear);
+      await fetchAcademicYears();
     } catch {
-      setStatus("Failed to create course.");
-      window.alert("Failed to create course.");
+      const message = "Failed to create course.";
+      setStatus(message);
+      window.alert(message);
     } finally {
       setLoadingCreate(false);
     }
@@ -169,14 +190,14 @@ export default function AdminCourseManager() {
       prev.map((row) =>
         row.id === id
           ? {
-              ...row,
-              [field]:
-                field === "semester" || field === "hoursPerWeek"
-                  ? value === ""
-                    ? null
-                    : Number(value)
-                  : value,
-            }
+            ...row,
+            [field]:
+              field === "semester" || field === "hoursPerWeek"
+                ? value === ""
+                  ? null
+                  : Number(value)
+                : value,
+          }
           : row
       )
     );
@@ -217,8 +238,9 @@ export default function AdminCourseManager() {
         await fetchOfferings(selectedProgram, selectedAcademicYear);
       }
     } catch {
-      setStatus("Failed to save changes.");
-      window.alert("Failed to save changes.");
+      const message = "Failed to save changes.";
+      setStatus(message);
+      window.alert(message);
     } finally {
       setSavingRowId(null);
     }
@@ -255,80 +277,253 @@ export default function AdminCourseManager() {
         await fetchOfferings(selectedProgram, selectedAcademicYear);
       }
     } catch {
-      setStatus("Failed to delete course.");
-      window.alert("Failed to delete course.");
+      const message = "Failed to delete course.";
+      setStatus(message);
+      window.alert(message);
     } finally {
       setSavingRowId(null);
     }
   };
 
+  const tabs: { key: AdminTab; label: string }[] = [
+    { key: "programs", label: "Programs" },
+    { key: "import", label: "Import" },
+    { key: "add", label: "Add Course" },
+    { key: "edit", label: "Edit Courses" },
+  ];
+
   return (
-    <div className="space-y-8">
-      <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold tracking-tight">Add a course</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Add a course and place it directly into a program and academic year.
-          </p>
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap gap-3">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => {
+                setActiveTab(tab.key);
+                setStatus(null);
+              }}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === tab.key
+                ? "bg-slate-900 text-white"
+                : "border border-slate-300 bg-white text-slate-900 hover:border-slate-400"
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        <form onSubmit={handleCreateCourse} className="space-y-5">
+      {activeTab === "programs" && (
+        <AdminProgramManager
+          onProgramsChanged={async () => {
+            await fetchPrograms();
+            await fetchAcademicYears();
+
+            if (selectedProgram && selectedAcademicYear) {
+              await fetchOfferings(selectedProgram, selectedAcademicYear);
+            }
+          }}
+        />
+      )}
+
+      {activeTab === "import" && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Import from Excel
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Upload an Excel file to import course and pathway data in bulk.
+            </p>
+          </div>
+
+          <AdminUploadForm />
+        </section>
+      )}
+
+      {activeTab === "add" && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold tracking-tight">Add a course</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Add a course and place it directly into a program and academic year.
+            </p>
+          </div>
+
+          <form onSubmit={handleCreateCourse} className="space-y-5">
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Course code
+                </span>
+                <input
+                  type="text"
+                  value={newCourse.code}
+                  onChange={(e) =>
+                    setNewCourse((prev) => ({ ...prev, code: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Course title
+                </span>
+                <input
+                  type="text"
+                  value={newCourse.title}
+                  onChange={(e) =>
+                    setNewCourse((prev) => ({ ...prev, title: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Pre-requisite
+                </span>
+                <input
+                  type="text"
+                  value={newCourse.preRequisite}
+                  onChange={(e) =>
+                    setNewCourse((prev) => ({
+                      ...prev,
+                      preRequisite: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">Program</span>
+                <select
+                  value={newCourse.programCode}
+                  onChange={(e) =>
+                    setNewCourse((prev) => ({
+                      ...prev,
+                      programCode: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                >
+                  <option value="">Select a program</option>
+                  {programs.map((program) => (
+                    <option key={program.code} value={program.code}>
+                      {program.title} ({program.code})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Academic year
+                </span>
+
+                <input
+                  type="text"
+                  placeholder="e.g. 2025-2026"
+                  value={newCourse.academicYear}
+                  onChange={(e) => {
+                    let value = e.target.value.replace(/[^0-9-]/g, "");
+
+                    // auto insert dash after 4 digits
+                    if (value.length === 4 && !value.includes("-")) {
+                      value += "-";
+                    }
+
+                    setNewCourse((prev) => ({
+                      ...prev,
+                      academicYear: value,
+                    }));
+                  }}
+                  list="academic-year-suggestions"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                />
+
+                {/* 👇 THIS is the autosuggest dropdown */}
+                <datalist id="academic-year-suggestions">
+                  {academicYears.map((year) => (
+                    <option key={year} value={year} />
+                  ))}
+                </datalist>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Semester
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  value={newCourse.semester}
+                  onChange={(e) =>
+                    setNewCourse((prev) => ({
+                      ...prev,
+                      semester: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Weekly hours
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  value={newCourse.hoursPerWeek}
+                  onChange={(e) =>
+                    setNewCourse((prev) => ({
+                      ...prev,
+                      hoursPerWeek: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="submit"
+                disabled={loadingCreate}
+                className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+              >
+                {loadingCreate ? "Creating..." : "Create course"}
+              </button>
+
+              {status && <p className="text-sm text-slate-600">{status}</p>}
+            </div>
+          </form>
+        </section>
+      )}
+
+      {activeTab === "edit" && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+          <div className="mb-6">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Edit courses in an academic year
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Change course code, course title, pre-requisite, semester, and
+              weekly hours for the selected program and academic year.
+            </p>
+          </div>
+
           <div className="grid gap-5 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">
-                Course code
-              </span>
-              <input
-                type="text"
-                value={newCourse.code}
-                onChange={(e) =>
-                  setNewCourse((prev) => ({ ...prev, code: e.target.value }))
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">
-                Course title
-              </span>
-              <input
-                type="text"
-                value={newCourse.title}
-                onChange={(e) =>
-                  setNewCourse((prev) => ({ ...prev, title: e.target.value }))
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">
-                Pre-requisite
-              </span>
-              <input
-                type="text"
-                value={newCourse.preRequisite}
-                onChange={(e) =>
-                  setNewCourse((prev) => ({
-                    ...prev,
-                    preRequisite: e.target.value,
-                  }))
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-              />
-            </label>
-
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-700">Program</span>
               <select
-                value={newCourse.programCode}
-                onChange={(e) =>
-                  setNewCourse((prev) => ({
-                    ...prev,
-                    programCode: e.target.value,
-                  }))
-                }
+                value={selectedProgram}
+                onChange={(e) => setSelectedProgram(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
               >
                 <option value="">Select a program</option>
@@ -345,13 +540,8 @@ export default function AdminCourseManager() {
                 Academic year
               </span>
               <select
-                value={newCourse.academicYear}
-                onChange={(e) =>
-                  setNewCourse((prev) => ({
-                    ...prev,
-                    academicYear: e.target.value,
-                  }))
-                }
+                value={selectedAcademicYear}
+                onChange={(e) => setSelectedAcademicYear(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
               >
                 <option value="">Select an academic year</option>
@@ -362,230 +552,151 @@ export default function AdminCourseManager() {
                 ))}
               </select>
             </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">Semester</span>
-              <input
-                type="number"
-                min="1"
-                value={newCourse.semester}
-                onChange={(e) =>
-                  setNewCourse((prev) => ({
-                    ...prev,
-                    semester: e.target.value,
-                  }))
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-700">
-                Weekly hours
-              </span>
-              <input
-                type="number"
-                min="0"
-                value={newCourse.hoursPerWeek}
-                onChange={(e) =>
-                  setNewCourse((prev) => ({
-                    ...prev,
-                    hoursPerWeek: e.target.value,
-                  }))
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-              />
-            </label>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              type="submit"
-              disabled={loadingCreate}
-              className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
-            >
-              {loadingCreate ? "Creating..." : "Create course"}
-            </button>
+          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+              {loadingOfferings
+                ? "Loading course offerings..."
+                : selectedProgram && selectedAcademicYear
+                  ? `${offerings.length} course offering${offerings.length === 1 ? "" : "s"
+                  }`
+                  : "Select a program and academic year to view offerings"}
+            </div>
 
-            {status && <p className="text-sm text-slate-600">{status}</p>}
-          </div>
-        </form>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Edit courses in an academic year
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Change course code, course title, pre-requisite, semester, and weekly
-            hours for the selected program and academic year.
-          </p>
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-700">Program</span>
-            <select
-              value={selectedProgram}
-              onChange={(e) => setSelectedProgram(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-            >
-              <option value="">Select a program</option>
-              {programs.map((program) => (
-                <option key={program.code} value={program.code}>
-                  {program.title} ({program.code})
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-700">
-              Academic year
-            </span>
-            <select
-              value={selectedAcademicYear}
-              onChange={(e) => setSelectedAcademicYear(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none focus:border-slate-400"
-            >
-              <option value="">Select an academic year</option>
-              {academicYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-            {loadingOfferings
-              ? "Loading course offerings..."
-              : selectedProgram && selectedAcademicYear
-              ? `${offerings.length} course offering${
-                  offerings.length === 1 ? "" : "s"
-                }`
-              : "Select a program and academic year to view offerings"}
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">Course Code</th>
-                  <th className="px-4 py-3">Course Title</th>
-                  <th className="px-4 py-3">Pre-requisite</th>
-                  <th className="px-4 py-3">Semester</th>
-                  <th className="px-4 py-3">Weekly Hours</th>
-                  <th className="px-4 py-3">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {offerings.map((row) => (
-                  <tr key={row.id}>
-                    <td className="border-t px-4 py-3">
-                      <input
-                        type="text"
-                        value={row.courseCode}
-                        onChange={(e) =>
-                          handleOfferingChange(row.id, "courseCode", e.target.value)
-                        }
-                        className="w-32 rounded-lg border border-slate-200 px-3 py-2"
-                      />
-                    </td>
-
-                    <td className="border-t px-4 py-3">
-                      <input
-                        type="text"
-                        value={row.courseTitle}
-                        onChange={(e) =>
-                          handleOfferingChange(row.id, "courseTitle", e.target.value)
-                        }
-                        className="w-full min-w-[220px] rounded-lg border border-slate-200 px-3 py-2"
-                      />
-                    </td>
-
-                    <td className="border-t px-4 py-3">
-                      <input
-                        type="text"
-                        value={row.preRequisite ?? ""}
-                        onChange={(e) =>
-                          handleOfferingChange(row.id, "preRequisite", e.target.value)
-                        }
-                        className="w-full min-w-[180px] rounded-lg border border-slate-200 px-3 py-2"
-                      />
-                    </td>
-
-                    <td className="border-t px-4 py-3">
-                      <input
-                        type="number"
-                        value={row.semester ?? ""}
-                        onChange={(e) =>
-                          handleOfferingChange(row.id, "semester", e.target.value)
-                        }
-                        className="w-24 rounded-lg border border-slate-200 px-3 py-2"
-                      />
-                    </td>
-
-                    <td className="border-t px-4 py-3">
-                      <input
-                        type="number"
-                        value={row.hoursPerWeek ?? ""}
-                        onChange={(e) =>
-                          handleOfferingChange(
-                            row.id,
-                            "hoursPerWeek",
-                            e.target.value
-                          )
-                        }
-                        className="w-28 rounded-lg border border-slate-200 px-3 py-2"
-                      />
-                    </td>
-
-                    <td className="border-t px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSaveOffering(row)}
-                          disabled={savingRowId === row.id}
-                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-                        >
-                          {savingRowId === row.id ? "Saving..." : "Save"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteOffering(row.id)}
-                          disabled={savingRowId === row.id}
-                          className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">Course Code</th>
+                    <th className="px-4 py-3">Course Title</th>
+                    <th className="px-4 py-3">Pre-requisite</th>
+                    <th className="px-4 py-3">Semester</th>
+                    <th className="px-4 py-3">Weekly Hours</th>
+                    <th className="px-4 py-3">Action</th>
                   </tr>
-                ))}
+                </thead>
+                <tbody>
+                  {offerings.map((row) => (
+                    <tr key={row.id}>
+                      <td className="border-t px-4 py-3">
+                        <input
+                          type="text"
+                          value={row.courseCode}
+                          onChange={(e) =>
+                            handleOfferingChange(
+                              row.id,
+                              "courseCode",
+                              e.target.value
+                            )
+                          }
+                          className="w-32 rounded-lg border border-slate-200 px-3 py-2"
+                        />
+                      </td>
 
-                {!loadingOfferings &&
-                  selectedProgram &&
-                  selectedAcademicYear &&
-                  offerings.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="border-t px-4 py-8 text-center text-slate-500"
-                      >
-                        No course offerings found for this academic year.
+                      <td className="border-t px-4 py-3">
+                        <input
+                          type="text"
+                          value={row.courseTitle}
+                          onChange={(e) =>
+                            handleOfferingChange(
+                              row.id,
+                              "courseTitle",
+                              e.target.value
+                            )
+                          }
+                          className="w-full min-w-[220px] rounded-lg border border-slate-200 px-3 py-2"
+                        />
+                      </td>
+
+                      <td className="border-t px-4 py-3">
+                        <input
+                          type="text"
+                          value={row.preRequisite ?? ""}
+                          onChange={(e) =>
+                            handleOfferingChange(
+                              row.id,
+                              "preRequisite",
+                              e.target.value
+                            )
+                          }
+                          className="w-full min-w-[180px] rounded-lg border border-slate-200 px-3 py-2"
+                        />
+                      </td>
+
+                      <td className="border-t px-4 py-3">
+                        <input
+                          type="number"
+                          value={row.semester ?? ""}
+                          onChange={(e) =>
+                            handleOfferingChange(
+                              row.id,
+                              "semester",
+                              e.target.value
+                            )
+                          }
+                          className="w-24 rounded-lg border border-slate-200 px-3 py-2"
+                        />
+                      </td>
+
+                      <td className="border-t px-4 py-3">
+                        <input
+                          type="number"
+                          value={row.hoursPerWeek ?? ""}
+                          onChange={(e) =>
+                            handleOfferingChange(
+                              row.id,
+                              "hoursPerWeek",
+                              e.target.value
+                            )
+                          }
+                          className="w-28 rounded-lg border border-slate-200 px-3 py-2"
+                        />
+                      </td>
+
+                      <td className="border-t px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveOffering(row)}
+                            disabled={savingRowId === row.id}
+                            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                          >
+                            {savingRowId === row.id ? "Saving..." : "Save"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOffering(row.id)}
+                            disabled={savingRowId === row.id}
+                            className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  )}
-              </tbody>
-            </table>
+                  ))}
+
+                  {!loadingOfferings &&
+                    selectedProgram &&
+                    selectedAcademicYear &&
+                    offerings.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="border-t px-4 py-8 text-center text-slate-500"
+                        >
+                          No course offerings found for this academic year.
+                        </td>
+                      </tr>
+                    )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

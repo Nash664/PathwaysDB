@@ -30,8 +30,8 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-10">
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+<div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-3xl font-bold tracking-tight">Find your courses</h2>
               <p className="mt-2 text-sm text-slate-600">
