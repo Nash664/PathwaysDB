@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminUploadForm from "@/components/AdminUploadForm";
 import AdminProgramManager from "@/components/AdminProgramManager";
+import CenteredModal from "@/components/CenteredModal";
 
 type Program = {
   code: string;
@@ -44,6 +45,14 @@ export default function AdminCourseManager() {
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [loadingOfferings, setLoadingOfferings] = useState(false);
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
+  const [modalMessage, setModalMessage] = useState<string | null>(null);
+  const [offeringPendingDeleteId, setOfferingPendingDeleteId] = useState<string | null>(
+    null
+  );
+
+  const openMessageModal = (message: string) => {
+    setModalMessage(message);
+  };
 
   const fetchPrograms = async () => {
     try {
@@ -110,7 +119,7 @@ export default function AdminCourseManager() {
       const message =
         "Course code, course title, program, and academic year are required.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
       return;
     }
 
@@ -144,12 +153,12 @@ export default function AdminCourseManager() {
       if (!response.ok) {
         const message = result?.message || "Failed to create course.";
         setStatus(message);
-        window.alert(message);
+        openMessageModal(message);
         return;
       }
 
       setStatus("Course created and added successfully.");
-      window.alert("Course created and added successfully.");
+      openMessageModal("Course created and added successfully.");
 
       setNewCourse({
         code: "",
@@ -170,7 +179,7 @@ export default function AdminCourseManager() {
     } catch {
       const message = "Failed to create course.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
     } finally {
       setLoadingCreate(false);
     }
@@ -227,12 +236,12 @@ export default function AdminCourseManager() {
       if (!response.ok) {
         const message = result?.message || "Failed to save changes.";
         setStatus(message);
-        window.alert(message);
+        openMessageModal(message);
         return;
       }
 
       setStatus("Course updated successfully.");
-      window.alert("Course updated successfully.");
+      openMessageModal("Course updated successfully.");
 
       if (selectedProgram && selectedAcademicYear) {
         await fetchOfferings(selectedProgram, selectedAcademicYear);
@@ -240,24 +249,23 @@ export default function AdminCourseManager() {
     } catch {
       const message = "Failed to save changes.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
     } finally {
       setSavingRowId(null);
     }
   };
 
   const handleDeleteOffering = async (id: string) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this course from this academic year?"
-    );
+    setOfferingPendingDeleteId(id);
+  };
 
-    if (!confirmed) return;
-
+  const confirmDeleteOffering = async () => {
+    if (!offeringPendingDeleteId) return;
     try {
-      setSavingRowId(id);
+      setSavingRowId(offeringPendingDeleteId);
       setStatus(null);
 
-      const response = await fetch(`/api/admin/offerings/${id}`, {
+      const response = await fetch(`/api/admin/offerings/${offeringPendingDeleteId}`, {
         method: "DELETE",
       });
 
@@ -266,12 +274,12 @@ export default function AdminCourseManager() {
       if (!response.ok) {
         const message = result?.message || "Failed to delete course.";
         setStatus(message);
-        window.alert(message);
+        openMessageModal(message);
         return;
       }
 
       setStatus("Course deleted successfully.");
-      window.alert("Course deleted successfully.");
+      openMessageModal("Course deleted successfully.");
 
       if (selectedProgram && selectedAcademicYear) {
         await fetchOfferings(selectedProgram, selectedAcademicYear);
@@ -279,9 +287,10 @@ export default function AdminCourseManager() {
     } catch {
       const message = "Failed to delete course.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
     } finally {
       setSavingRowId(null);
+      setOfferingPendingDeleteId(null);
     }
   };
 
@@ -697,6 +706,23 @@ export default function AdminCourseManager() {
           </div>
         </section>
       )}
+
+      <CenteredModal
+        isOpen={modalMessage !== null}
+        title="Notice"
+        message={modalMessage ?? ""}
+        onConfirm={() => setModalMessage(null)}
+      />
+
+      <CenteredModal
+        isOpen={offeringPendingDeleteId !== null}
+        title="Confirm delete"
+        message="Are you sure you want to delete this course from this academic year?"
+        onConfirm={confirmDeleteOffering}
+        onCancel={() => setOfferingPendingDeleteId(null)}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

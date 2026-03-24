@@ -192,6 +192,36 @@ export default function UnifiedCourseSearch({
     return courseOptions.slice(0, 8);
   }, [courseOptions]);
 
+  const groupedResultsBySemester = useMemo(() => {
+    const grouped = new Map<string, SearchResult[]>();
+
+    for (const row of results) {
+      const key = row.semester === null ? "Unassigned semester" : `Semester ${row.semester}`;
+      const existing = grouped.get(key) ?? [];
+      existing.push(row);
+      grouped.set(key, existing);
+    }
+
+    return Array.from(grouped.entries()).sort(([a], [b]) => {
+      if (a === "Unassigned semester") return 1;
+      if (b === "Unassigned semester") return -1;
+      const aNum = Number(a.replace("Semester ", ""));
+      const bNum = Number(b.replace("Semester ", ""));
+      return aNum - bNum;
+    });
+  }, [results]);
+
+  const groupedProgramLabels = useMemo(() => {
+    const labels = new Set<string>();
+    for (const row of results) {
+      labels.add(`${row.programTitle} (${row.programCode})`);
+    }
+    return Array.from(labels);
+  }, [results]);
+
+  const shouldShowProgramPerRecord =
+    Boolean(selectedCourseCode) || courseQuery.trim().length > 0;
+
   const handleSearch = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -375,8 +405,6 @@ export default function UnifiedCourseSearch({
               setSemester("");
               setCourseQuery("");
               setSelectedCourseCode("");
-              setAcademicYears([]);
-              setSemesters([]);
               setCourseOptions([]);
               setResults([]);
               setStatus(null);
@@ -391,7 +419,7 @@ export default function UnifiedCourseSearch({
       {status && <p className="text-sm text-slate-600">{status}</p>}
 
       {results.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="print-area overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-4">
             <p className="text-sm font-medium text-slate-700">
               {results.length} result{results.length === 1 ? "" : "s"} found
@@ -399,50 +427,113 @@ export default function UnifiedCourseSearch({
             <button
               type="button"
               onClick={() => window.print()}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              className="no-print rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
             >
               Print
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">Program</th>
-                  <th className="px-4 py-3">Academic Year</th>
-                  <th className="px-4 py-3">Semester</th>
-                  <th className="px-4 py-3">Course Code</th>
-                  <th className="px-4 py-3">Course Title</th>
-                  <th className="px-4 py-3">Hours/Week</th>
-                  <th className="px-4 py-3">Total Hours/Sem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((row, index) => (
-                  <tr
-                    key={`${row.programCode}-${row.academicYear}-${row.courseCode}-${row.semester}-${index}`}
-                  >
-                    <td className="border-t px-4 py-3 font-medium text-slate-900">
-                      {row.programTitle} ({row.programCode})
-                    </td>
-                    <td className="border-t px-4 py-3">{row.academicYear}</td>
-                    <td className="border-t px-4 py-3">{row.semester ?? "-"}</td>
-                    <td className="border-t px-4 py-3 font-semibold">
-                      {row.courseCode}
-                    </td>
-                    <td className="border-t px-4 py-3">{row.courseTitle}</td>
-                    <td className="border-t px-4 py-3">
-                      {row.hoursPerWeek ?? "-"}
-                    </td>
-                    <td className="border-t px-4 py-3">
-                      {row.semesterTotalHours ?? "-"}
-                    </td>
+          {semester ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3">Program</th>
+                    <th className="px-4 py-3">Academic Year</th>
+                    <th className="px-4 py-3">Semester</th>
+                    <th className="px-4 py-3">Course Code</th>
+                    <th className="px-4 py-3">Course Title</th>
+                    <th className="px-4 py-3">Hours/Week</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {results.map((row, index) => (
+                    <tr
+                      key={`${row.programCode}-${row.academicYear}-${row.courseCode}-${row.semester}-${index}`}
+                    >
+                      <td className="border-t px-4 py-3 font-medium text-slate-900">
+                        {row.programTitle} ({row.programCode})
+                      </td>
+                      <td className="border-t px-4 py-3">{row.academicYear}</td>
+                      <td className="border-t px-4 py-3">{row.semester ?? "-"}</td>
+                      <td className="border-t px-4 py-3 font-semibold">
+                        {row.courseCode}
+                      </td>
+                      <td className="border-t px-4 py-3">{row.courseTitle}</td>
+                      <td className="border-t px-4 py-3">
+                        {row.hoursPerWeek ?? "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="space-y-5 p-4">
+              {!shouldShowProgramPerRecord && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-sm font-medium text-slate-700">
+                    {groupedProgramLabels.length === 1 ? "Program" : "Programs"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-900">
+                    {groupedProgramLabels.join(", ")}
+                  </p>
+                </div>
+              )}
+
+              {groupedResultsBySemester.map(([semesterLabel, rows]) => (
+                <div
+                  key={semesterLabel}
+                  className="overflow-hidden rounded-xl border border-slate-200"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <h3 className="text-sm font-semibold text-slate-800">
+                      {semesterLabel}
+                    </h3>
+                    <span className="text-xs text-slate-600">
+                      {rows.length} course{rows.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-600">
+                        <tr>
+                          {shouldShowProgramPerRecord && (
+                            <th className="px-4 py-3">Program</th>
+                          )}
+                          <th className="px-4 py-3">Academic Year</th>
+                          <th className="px-4 py-3">Course Code</th>
+                          <th className="px-4 py-3">Course Title</th>
+                          <th className="px-4 py-3">Hours/Week</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row, index) => (
+                          <tr
+                            key={`${semesterLabel}-${row.programCode}-${row.academicYear}-${row.courseCode}-${index}`}
+                          >
+                            {shouldShowProgramPerRecord && (
+                              <td className="border-t px-4 py-3 font-medium text-slate-900">
+                                {row.programTitle} ({row.programCode})
+                              </td>
+                            )}
+                            <td className="border-t px-4 py-3">{row.academicYear}</td>
+                            <td className="border-t px-4 py-3 font-semibold">
+                              {row.courseCode}
+                            </td>
+                            <td className="border-t px-4 py-3">{row.courseTitle}</td>
+                            <td className="border-t px-4 py-3">
+                              {row.hoursPerWeek ?? "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>

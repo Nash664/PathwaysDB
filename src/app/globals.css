@@ -26,6 +26,10 @@ body {
 }
 
 @media print {
+  @page {
+    margin: 12mm;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -39,6 +43,11 @@ body {
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
+    width: calc(100% - 24mm);
+    overflow: visible !important;
+  }
+
+  .no-print {
+    display: none !important;
   }
 }

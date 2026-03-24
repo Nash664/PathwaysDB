@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CenteredModal from "@/components/CenteredModal";
 
 type ProgramApi = {
   code: string;
@@ -30,6 +31,12 @@ export default function AdminProgramManager({
   const [loadingCreate, setLoadingCreate] = useState(false);
   const [savingCode, setSavingCode] = useState<string | null>(null);
   const [deletingCode, setDeletingCode] = useState<string | null>(null);
+  const [modalMessage, setModalMessage] = useState<string | null>(null);
+  const [programPendingDelete, setProgramPendingDelete] = useState<ProgramRow | null>(null);
+
+  const openMessageModal = (message: string) => {
+    setModalMessage(message);
+  };
 
   const fetchPrograms = async () => {
     try {
@@ -62,7 +69,7 @@ export default function AdminProgramManager({
     if (!newProgram.code.trim() || !newProgram.title.trim()) {
       const message = "Program code and program title are required.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
       return;
     }
 
@@ -86,12 +93,12 @@ export default function AdminProgramManager({
       if (!response.ok) {
         const message = result?.message || "Failed to create program.";
         setStatus(message);
-        window.alert(message);
+        openMessageModal(message);
         return;
       }
 
       setStatus("Program created successfully.");
-      window.alert("Program created successfully.");
+      openMessageModal("Program created successfully.");
 
       setNewProgram({
         code: "",
@@ -103,7 +110,7 @@ export default function AdminProgramManager({
     } catch {
       const message = "Failed to create program.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
     } finally {
       setLoadingCreate(false);
     }
@@ -130,7 +137,7 @@ export default function AdminProgramManager({
     if (!program.code.trim() || !program.title.trim()) {
       const message = "Program code and program title are required.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
       return;
     }
 
@@ -157,37 +164,36 @@ export default function AdminProgramManager({
       if (!response.ok) {
         const message = result?.message || "Failed to update program.";
         setStatus(message);
-        window.alert(message);
+        openMessageModal(message);
         return;
       }
 
       setStatus("Program updated successfully.");
-      window.alert("Program updated successfully.");
+      openMessageModal("Program updated successfully.");
 
       await fetchPrograms();
       await onProgramsChanged?.();
     } catch {
       const message = "Failed to update program.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
     } finally {
       setSavingCode(null);
     }
   };
 
   const handleDeleteProgram = async (program: ProgramRow) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this program?"
-    );
+    setProgramPendingDelete(program);
+  };
 
-    if (!confirmed) return;
-
+  const confirmDeleteProgram = async () => {
+    if (!programPendingDelete) return;
     try {
-      setDeletingCode(program.originalCode);
+      setDeletingCode(programPendingDelete.originalCode);
       setStatus(null);
 
       const response = await fetch(
-        `/api/admin/programs/${encodeURIComponent(program.originalCode)}`,
+        `/api/admin/programs/${encodeURIComponent(programPendingDelete.originalCode)}`,
         {
           method: "DELETE",
         }
@@ -198,21 +204,22 @@ export default function AdminProgramManager({
       if (!response.ok) {
         const message = result?.message || "Failed to delete program.";
         setStatus(message);
-        window.alert(message);
+        openMessageModal(message);
         return;
       }
 
       setStatus("Program deleted successfully.");
-      window.alert("Program deleted successfully.");
+      openMessageModal("Program deleted successfully.");
 
       await fetchPrograms();
       await onProgramsChanged?.();
     } catch {
       const message = "Failed to delete program.";
       setStatus(message);
-      window.alert(message);
+      openMessageModal(message);
     } finally {
       setDeletingCode(null);
+      setProgramPendingDelete(null);
     }
   };
 
@@ -363,6 +370,23 @@ export default function AdminProgramManager({
           </div>
         </div>
       </section>
+
+      <CenteredModal
+        isOpen={modalMessage !== null}
+        title="Notice"
+        message={modalMessage ?? ""}
+        onConfirm={() => setModalMessage(null)}
+      />
+
+      <CenteredModal
+        isOpen={programPendingDelete !== null}
+        title="Confirm delete"
+        message="Are you sure you want to delete this program?"
+        onConfirm={confirmDeleteProgram}
+        onCancel={() => setProgramPendingDelete(null)}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

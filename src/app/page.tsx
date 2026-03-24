@@ -21,7 +21,7 @@ export default function Home() {
           </div>
 
           <Link
-            href="/admin"
+            href="/admin/courses"
             className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
           >
             Admin

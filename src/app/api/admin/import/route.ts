@@ -44,9 +44,24 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ message: "Missing file." }, { status: 400 });
     }
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith(".xlsx") && !fileName.endsWith(".xls")) {
+      return NextResponse.json(
+        { message: "Wrong file or format." },
+        { status: 400 }
+      );
+    }
 
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(Buffer.from(arrayBuffer), { type: "buffer" });
+    let workbook: XLSX.WorkBook;
+    try {
+      workbook = XLSX.read(Buffer.from(arrayBuffer), { type: "buffer" });
+    } catch {
+      return NextResponse.json(
+        { message: "Wrong file or format." },
+        { status: 400 }
+      );
+    }
 
     const requiredSheets = {
       Courses: ["Crs_Code", "Crs_Title"],
@@ -61,7 +76,7 @@ export async function POST(request: Request) {
       const sheet = workbook.Sheets[sheetName];
       if (!sheet) {
         return NextResponse.json(
-          { message: `Missing sheet: ${sheetName}.` },
+          { message: "Wrong file or format." },
           { status: 400 }
         );
       }
@@ -74,9 +89,7 @@ export async function POST(request: Request) {
       if (missingHeaders.length) {
         return NextResponse.json(
           {
-            message: `Sheet ${sheetName} is missing columns: ${missingHeaders.join(
-              ", "
-            )}.`,
+            message: "Wrong file or format.",
           },
           { status: 400 }
         );
