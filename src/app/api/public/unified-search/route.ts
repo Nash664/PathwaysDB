@@ -3,13 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-
   const programCode = searchParams.get("programCode")?.trim() ?? "";
   const academicYear = searchParams.get("academicYear")?.trim() ?? "";
   const courseCode = searchParams.get("courseCode")?.trim() ?? "";
   const query = searchParams.get("query")?.trim() ?? "";
   const semesterParam = searchParams.get("semester")?.trim() ?? "";
-
   const semester =
     semesterParam && !Number.isNaN(Number(semesterParam))
       ? Number(semesterParam)
@@ -53,7 +51,6 @@ export async function GET(request: NextRequest) {
     });
 
     const totals = new Map<string, number>();
-
     for (const row of rows) {
       const key = `${row.programCycle.programCode}-${row.programCycle.term}-${row.semester ?? ""}`;
       totals.set(key, (totals.get(key) ?? 0) + (row.hoursPerWeek ?? 0));
@@ -62,7 +59,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       rows.map((row) => {
         const key = `${row.programCycle.programCode}-${row.programCycle.term}-${row.semester ?? ""}`;
-
         return {
           programCode: row.programCycle.program.code,
           programTitle: row.programCycle.program.title,
@@ -70,6 +66,7 @@ export async function GET(request: NextRequest) {
           semester: row.semester,
           courseCode: row.course.code,
           courseTitle: row.course.title,
+          preRequisite: row.course.preRequisite ?? null, // ✅ was missing
           hoursPerWeek: row.hoursPerWeek,
           semesterTotalHours: totals.get(key) ?? null,
         };
