@@ -135,76 +135,47 @@ function normalizeCourseOptions(data: unknown): CourseOption[] {
 }
 
 /**
- * Derives semester-level summary stats from a group of rows.
- *
- * - totalHours      : sum of hoursPerWeek across the rows
- * - totalCredits    : derived as hoursPerWeek / semesterWeeks (assumed 15)
- *                     If semesterTotalHours is available on a row we use
- *                     that directly, otherwise we fall back to hoursPerWeek * 15.
- * - courseCount     : number of courses in this group
- * - programMaxHours : the total program hours for the semester
- *                     (taken from the first row that has semesterTotalHours)
+ * Derives load stats for one semester using:
+ * - allRows  : baseline semester workload (100%)
+ * - keptRows : currently included courses after unchecking
  */
-const SEMESTER_WEEKS = 15;
-
 type SemesterSummary = {
-  courseCount: number;
-  totalHoursPerWeek: number | null;
-  totalCredits: number | null;
-  programTotalHours: number | null;
-  enrolledPercentage: number | null;
-  isFullTime: boolean | null;
-  osapFullTime: boolean | null;
-  osapAccessible: boolean | null;
+  totalCourseCount: number;
+  keptCourseCount: number;
+  totalHoursPerWeek: number;
+  keptHoursPerWeek: number;
+  courseLoadPercent: number;
+  hoursLoadPercent: number;
+  academicByHours: boolean;
+  osapFullTime: boolean;
+  osapThreshold: 60 | 40;
 };
 
-function computeSemesterSummary(rows: SearchResult[]): SemesterSummary {
-  const courseCount = rows.length;
-
-  // Sum hours/week
-  const hoursRows = rows.filter((r) => r.hoursPerWeek !== null);
-  const totalHoursPerWeek =
-    hoursRows.length > 0
-      ? hoursRows.reduce((acc, r) => acc + (r.hoursPerWeek ?? 0), 0)
-      : null;
-
-  // Total credits (hrs/week * weeks / credit_unit — here we treat 1 hr/week/semester = 1 credit)
-  const totalCredits =
-    totalHoursPerWeek !== null ? totalHoursPerWeek * SEMESTER_WEEKS : null;
-
-  // Program total hours — first non-null semesterTotalHours value in the group
-  const programTotalHours =
-    rows.find((r) => r.semesterTotalHours !== null)?.semesterTotalHours ?? null;
-
-  // Enrolment percentage (enrolled hours / program total hours)
-  const enrolledPercentage =
-    totalHoursPerWeek !== null && programTotalHours !== null && programTotalHours > 0
-      ? (totalHoursPerWeek / programTotalHours) * 100
-      : null;
-
-  // Full-time: enrolled in >= 70% of program hours
-  const isFullTime =
-    enrolledPercentage !== null ? enrolledPercentage >= 70 : null;
-
-  // OSAP full-time: enrolled in >= 60% of required courses (≥12 wk courses)
-  const osapFullTime =
-    enrolledPercentage !== null ? enrolledPercentage >= 60 : null;
-
-  // Accessible Learning Services reduced load: >= 40%
-  const osapAccessible =
-    enrolledPercentage !== null
-      ? enrolledPercentage >= 40 && enrolledPercentage < 60
-      : null;
+function computeSemesterSummary(
+  allRows: SearchResult[],
+  keptRows: SearchResult[],
+  osapReducedLoad: boolean
+): SemesterSummary {
+  const totalCourseCount = allRows.length;
+  const keptCourseCount = keptRows.length;
+  const totalHoursPerWeek = allRows.reduce((acc, row) => acc + (row.hoursPerWeek ?? 0), 0);
+  const keptHoursPerWeek = keptRows.reduce((acc, row) => acc + (row.hoursPerWeek ?? 0), 0);
+  const courseLoadPercent =
+    totalCourseCount > 0 ? (keptCourseCount / totalCourseCount) * 100 : 0;
+  const hoursLoadPercent =
+    totalHoursPerWeek > 0 ? (keptHoursPerWeek / totalHoursPerWeek) * 100 : 0;
+  const osapThreshold: 60 | 40 = osapReducedLoad ? 40 : 60;
 
   return {
-    courseCount,
+    totalCourseCount,
+    keptCourseCount,
     totalHoursPerWeek,
-    totalCredits,
-    programTotalHours,
-    enrolledPercentage,
-    isFullTime,
-    osapFullTime,
-    osapAccessible,
+    keptHoursPerWeek,
+    courseLoadPercent,
+    hoursLoadPercent,
+    academicByHours: hoursLoadPercent >= 70,
+    osapFullTime: courseLoadPercent >= osapThreshold,
+    osapThreshold,
   };
 }
 
@@ -228,99 +199,46 @@ function StatusPill({
 
 function SemesterSummaryBlock({ summary }: { summary: SemesterSummary }) {
   const {
-    courseCount,
+    totalCourseCount,
+    keptCourseCount,
     totalHoursPerWeek,
-    totalCredits,
-    programTotalHours,
-    enrolledPercentage,
-    isFullTime,
+    keptHoursPerWeek,
+    courseLoadPercent,
+    hoursLoadPercent,
+    academicByHours,
     osapFullTime,
-    osapAccessible,
+    osapThreshold,
   } = summary;
-
-  const pct =
-    enrolledPercentage !== null ? Math.round(enrolledPercentage) : null;
-
-  // Determine OSAP status label
-  let osapLabel: string;
-  let osapVariant: "success" | "warning" | "danger" | "neutral";
-
-  if (pct === null) {
-    osapLabel = "OSAP: insufficient data";
-    osapVariant = "neutral";
-  } else if (osapFullTime) {
-    osapLabel = "OSAP eligible — full-time";
-    osapVariant = "success";
-  } else if (osapAccessible) {
-    osapLabel = "OSAP eligible — ALS reduced load";
-    osapVariant = "warning";
-  } else {
-    osapLabel = "Below OSAP threshold";
-    osapVariant = "danger";
-  }
 
   return (
     <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        {/* Stat: courses */}
         <div className="min-w-0">
-          <p className="text-xs text-slate-500">Courses</p>
-          <p className="text-sm font-semibold text-slate-800">{courseCount}</p>
+          <p className="text-xs text-slate-500">Courses kept</p>
+          <p className="text-sm font-semibold text-slate-800">
+            {keptCourseCount}/{totalCourseCount} ({courseLoadPercent.toFixed(2)}%)
+          </p>
         </div>
 
-        {/* Stat: hours/week */}
-        {totalHoursPerWeek !== null && (
-          <div className="min-w-0">
-            <p className="text-xs text-slate-500">Hours / week</p>
-            <p className="text-sm font-semibold text-slate-800">
-              {totalHoursPerWeek}
-            </p>
-          </div>
-        )}
+        <div className="min-w-0">
+          <p className="text-xs text-slate-500">Hours kept / week</p>
+          <p className="text-sm font-semibold text-slate-800">
+            {keptHoursPerWeek}/{totalHoursPerWeek} ({hoursLoadPercent.toFixed(2)}%)
+          </p>
+        </div>
 
-        {/* Stat: total hours (credits proxy) */}
-        {totalCredits !== null && (
-          <div className="min-w-0">
-            <p className="text-xs text-slate-500">
-              Total hours ({SEMESTER_WEEKS} wks)
-            </p>
-            <p className="text-sm font-semibold text-slate-800">
-              {totalCredits}
-            </p>
-          </div>
-        )}
-
-        {/* Stat: program total hours */}
-        {programTotalHours !== null && (
-          <div className="min-w-0">
-            <p className="text-xs text-slate-500">Program total hours</p>
-            <p className="text-sm font-semibold text-slate-800">
-              {programTotalHours}
-            </p>
-          </div>
-        )}
-
-        {/* Stat: enrolment % */}
-        {pct !== null && (
-          <div className="min-w-0">
-            <p className="text-xs text-slate-500">Enrolment %</p>
-            <p className="text-sm font-semibold text-slate-800">{pct}%</p>
-          </div>
-        )}
-
-        {/* Pills */}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {isFullTime !== null && (
-            <StatusPill
-              label={isFullTime ? "Full-time" : "Part-time"}
-              variant={isFullTime ? "success" : "warning"}
-            />
-          )}
-          <StatusPill label={osapLabel} variant={osapVariant} />
+          <StatusPill
+            label={`Academic (hours): ${academicByHours ? "Full-time" : "Part-time"}`}
+            variant={academicByHours ? "success" : "warning"}
+          />
+          <StatusPill
+            label={`OSAP ${osapThreshold}%: ${osapFullTime ? "Full-time" : "Part-time"}`}
+            variant={osapFullTime ? "success" : "danger"}
+          />
         </div>
       </div>
 
-      {/* Eligibility thresholds legend */}
       <details className="mt-2">
         <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600 select-none">
           Eligibility thresholds
@@ -367,6 +285,8 @@ export default function UnifiedCourseSearch({
   const [loadingPrereqs, setLoadingPrereqs] = useState(false);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [removedCourseKeys, setRemovedCourseKeys] = useState<Set<string>>(new Set());
+  const [osapReducedLoad, setOsapReducedLoad] = useState(false);
 
   const courseBoxRef = useRef<HTMLDivElement | null>(null);
 
@@ -406,6 +326,8 @@ export default function UnifiedCourseSearch({
     setStatus(null);
     setPrerequisites(new Map());
     setShowSuggestions(false);
+    setRemovedCourseKeys(new Set());
+    setOsapReducedLoad(false);
   }, [resetSignal]);
 
   useEffect(() => {
@@ -489,6 +411,24 @@ export default function UnifiedCourseSearch({
   const shouldShowProgramPerRecord =
     Boolean(selectedCourseCode) || courseQuery.trim().length > 0;
 
+  const getRowKey = (row: SearchResult) =>
+    `${row.programCode}__${row.academicYear}__${row.semester ?? "none"}__${row.courseCode}`;
+
+  const isRowIncluded = (row: SearchResult) => !removedCourseKeys.has(getRowKey(row));
+
+  const toggleRowIncluded = (row: SearchResult, checked: boolean) => {
+    const key = getRowKey(row);
+    setRemovedCourseKeys((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const handleSearch = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (
@@ -526,6 +466,7 @@ export default function UnifiedCourseSearch({
       }
       const rows: SearchResult[] = Array.isArray(data) ? data : [];
       setResults(rows);
+      setRemovedCourseKeys(new Set());
       if (rows.length === 0) {
         setStatus("No matching courses found.");
       }
@@ -673,6 +614,8 @@ export default function UnifiedCourseSearch({
               setResults([]);
               setStatus(null);
               setPrerequisites(new Map());
+              setRemovedCourseKeys(new Set());
+              setOsapReducedLoad(false);
             }}
             className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-400"
           >
@@ -697,6 +640,16 @@ export default function UnifiedCourseSearch({
               Print
             </button>
           </div>
+          <div className="no-print border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={osapReducedLoad}
+                onChange={(event) => setOsapReducedLoad(event.target.checked)}
+              />
+              Accessible Learning reduced load (OSAP 40% threshold)
+            </label>
+          </div>
 
           {/* ── Flat table view when a specific semester is selected ── */}
           {semester ? (
@@ -705,6 +658,7 @@ export default function UnifiedCourseSearch({
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
+                      <th className="no-print px-4 py-3">Include</th>
                       <th className="px-4 py-3">Program</th>
                       <th className="px-4 py-3">Academic Year</th>
                       <th className="px-4 py-3">Semester</th>
@@ -719,6 +673,15 @@ export default function UnifiedCourseSearch({
                       <tr
                         key={`${row.programCode}-${row.academicYear}-${row.courseCode}-${row.semester}-${index}`}
                       >
+                        <td className="no-print border-t px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={isRowIncluded(row)}
+                            onChange={(event) =>
+                              toggleRowIncluded(row, event.target.checked)
+                            }
+                          />
+                        </td>
                         <td className="border-t px-4 py-3 font-medium text-slate-900">
                           {row.programTitle} ({row.programCode})
                         </td>
@@ -743,7 +706,11 @@ export default function UnifiedCourseSearch({
               </div>
               {/* Summary for the single selected semester */}
               <SemesterSummaryBlock
-                summary={computeSemesterSummary(results)}
+                summary={computeSemesterSummary(
+                  results,
+                  results.filter(isRowIncluded),
+                  osapReducedLoad
+                )}
               />
             </>
           ) : (
@@ -761,7 +728,6 @@ export default function UnifiedCourseSearch({
               )}
 
               {groupedResultsBySemester.map(([semesterLabel, rows]) => {
-                const summary = computeSemesterSummary(rows);
                 return (
                   <div
                     key={semesterLabel}
@@ -782,6 +748,7 @@ export default function UnifiedCourseSearch({
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 text-slate-600">
                           <tr>
+                            <th className="no-print px-4 py-3">Include</th>
                             {shouldShowProgramPerRecord && (
                               <th className="px-4 py-3">Program</th>
                             )}
@@ -797,6 +764,15 @@ export default function UnifiedCourseSearch({
                             <tr
                               key={`${semesterLabel}-${row.programCode}-${row.academicYear}-${row.courseCode}-${index}`}
                             >
+                              <td className="no-print border-t px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isRowIncluded(row)}
+                                  onChange={(event) =>
+                                    toggleRowIncluded(row, event.target.checked)
+                                  }
+                                />
+                              </td>
                               {shouldShowProgramPerRecord && (
                                 <td className="border-t px-4 py-3 font-medium text-slate-900">
                                   {row.programTitle} ({row.programCode})
@@ -824,7 +800,13 @@ export default function UnifiedCourseSearch({
                     </div>
 
                     {/* ── Semester summary ── */}
-                    <SemesterSummaryBlock summary={summary} />
+                    <SemesterSummaryBlock
+                      summary={computeSemesterSummary(
+                        rows,
+                        rows.filter(isRowIncluded),
+                        osapReducedLoad
+                      )}
+                    />
                   </div>
                 );
               })}
