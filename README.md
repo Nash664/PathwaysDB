@@ -1,71 +1,69 @@
-# Pathways Course Finder
+# Pathways App
 
-Full-stack Next.js app for selecting a program + cycle and viewing courses.
+Pathways is a web app for program and course lookup with an admin panel for uploading and managing academic data.  
+The admin import uses Excel files and writes the data into PostgreSQL through Prisma.
 
-## What we built
-- Student view with tabs: program/cycle course list and course-code search.
-- Admin login with Excel import (replaces DB contents).
-- Admin course manager to edit course info plus semester/hours per cycle.(not working properly)
+## Stack
 
-## Known limitations / not working yet
-- Course title/code edits are global across all cycles (no per-cycle overrides).
-- No admin UI to add/remove a course from a cycle (edit only).
-- No production deployment instructions yet (local only in this README).
+- Next.js 16
+- TypeScript
+- Prisma
+- PostgreSQL
+- NextAuth (credentials)
 
-## Run locally (macOS)
-1. Install Node.js (LTS) from https://nodejs.org.
-2. Install PostgreSQL (recommended via Homebrew):
+## Requirements
 
-```
-brew install postgresql@16
-brew services start postgresql@16
-```
+- Node.js LTS
+- npm
+- PostgreSQL 14+ (16 recommended)
 
-3. Create the database and user:
+## Setup
 
-```
-psql postgres
+1) Clone the repository and open it:
+
+```bash
+cd pathways-app
 ```
 
-Then in the psql prompt:
+2) Install dependencies:
 
+```bash
+npm install
 ```
-CREATE USER pathways_user WITH PASSWORD 'StrongPassword123!';
+
+3) Create `.env` in project root:
+
+```env
+DATABASE_URL=postgresql://pathways_user:ChangeThisPassword123!@localhost:5432/pathways
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-random-secret
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=strong-password
+```
+
+## PostgreSQL Local Configuration
+
+Install PostgreSQL: [postgresql.org/download/windows](https://www.postgresql.org/download/windows/)
+
+Open SQL Shell (`psql`) and run:
+
+```sql
+CREATE USER pathways_user WITH PASSWORD 'ChangeThisPassword123!';
 CREATE DATABASE pathways OWNER pathways_user;
 GRANT ALL PRIVILEGES ON DATABASE pathways TO pathways_user;
 ```
 
-4. Create a `.env` file in this folder:
+## Run Locally
 
-```
-DATABASE_URL="postgresql://pathways_user:StrongPassword123!@localhost:5432/pathways"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="replace-with-a-long-random-string"
-ADMIN_EMAIL="admin@example.com"
-ADMIN_PASSWORD="change-this-password"
-```
-
-5. Install dependencies:
-
-```
-npm install
-```
-
-6. Generate Prisma client + run migrations:
-
-```
-npx prisma generate
-npx prisma migrate dev --name init
-```
-
-7. Start the dev server:
-
-```
+```bash
+npx prisma migrate dev
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open:
+- `http://localhost:3000`
+- `http://localhost:3000/admin`
 
-## Import data
-- Go to `/admin` and sign in with the admin credentials.
-- Upload the Excel file. This replaces existing records.
+## Full Runbook
+
+See `HANDOVER.md` for complete Deployment, operations and transfer documentation.
