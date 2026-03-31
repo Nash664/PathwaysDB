@@ -9,24 +9,7 @@ This document is production-only. It covers Neon database setup, Vercel deployme
 - ORM/migrations: Prisma
 - Auth: NextAuth credentials provider
 
-## 2) Required Environment Variables (Vercel)
-
-Set these in Vercel Project Settings -> Environment Variables for `Production`:
-
-```env
-DATABASE_URL=postgresql://...neon.../?sslmode=require
-NEXTAUTH_URL=https://your-domain.vercel.app
-NEXTAUTH_SECRET=long-random-secret
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=strong-password
-```
-
-Rules:
-- `DATABASE_URL` key must be exactly `DATABASE_URL`.
-- Use Neon Postgres URL that starts with `postgresql://` or `postgres://`.
-- `NEXTAUTH_URL` must be the deployed domain.
-
-## 3) Neon Setup
+## 2) Neon Setup
 
 1. Create a Neon project.
 2. Create a database (or use default).
@@ -34,7 +17,7 @@ Rules:
 4. Ensure SSL is enabled (`?sslmode=require` is present).
 5. Save this value as `DATABASE_URL` in Vercel.
 
-## 4) Vercel Deployment
+## 3) Vercel Setup
 
 ### Git integration flow
 
@@ -51,6 +34,23 @@ npx vercel login
 npx vercel link
 npx vercel --prod
 ```
+
+## 4) Required Environment Variables (Vercel)
+
+Set these in Vercel Project Settings -> Environment Variables for `Production`:
+
+```env
+DATABASE_URL=postgresql://...neon.../?sslmode=require
+NEXTAUTH_URL=https://your-domain.vercel.app
+NEXTAUTH_SECRET=long-random-secret
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=strong-password
+```
+
+Rules:
+- `DATABASE_URL` key must be exactly `DATABASE_URL`.
+- Use Neon Postgres URL that starts with `postgresql://` or `postgres://`.
+- `NEXTAUTH_URL` must be the deployed domain.
 
 ## 5) Production Migration Runbook (Required)
 

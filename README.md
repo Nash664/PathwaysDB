@@ -66,4 +66,4 @@ Open:
 
 ## Full Runbook
 
-See `HANDOVER.md` for complete Deployment, operations and transfer documentation.
+See [HANDOVER.md](./HANDOVER.md) for complete deployment, operations, and transfer documentation.
